@@ -6,7 +6,7 @@ namespace Program
     {
         static void Main(string[] args)
         {
-            var scrapper = new JVCScrapper();
+            var scrapper = new JVCScrapper(2103);
 
             scrapper.GetGrades();
         }
