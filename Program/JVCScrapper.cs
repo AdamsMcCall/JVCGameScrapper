@@ -13,6 +13,7 @@ namespace Program
     {
         private readonly int _pagesLimit;
         private int _pageNumber = 1;
+        private int _threadsNumber;
         private int _threadsDone = 0;
         private string _url = "https://www.jeuxvideo.com/tous-les-jeux/";
         private string _titleLandmark = "class=\"gameTitleLink__196nPy\"";
@@ -23,10 +24,11 @@ namespace Program
         private Object _gameInfoLock = new Object();
         private Object _threadsDoneLock = new Object();
 
-        public JVCScrapper(int pagesLimit)
+        public JVCScrapper(int pagesLimit, int threadsNumber)
         {
             gameInfos = new List<GameInfo>();
             _pagesLimit = pagesLimit;
+            _threadsNumber = threadsNumber;
         }
 
         void ThreadLoop(object pageNb)
@@ -144,14 +146,13 @@ namespace Program
         public void GetGrades()
         {
             var pool = new MyThreadPool();
-            var threadNumber = 4;
 
-            for (int i = 0; i < threadNumber; ++i)
+            for (int i = 0; i < _threadsNumber; ++i)
             {
                 pool.StartThread(new ParameterizedThreadStart(ThreadLoop), _pageNumber);
                 ++_pageNumber;
             }
-            while (_threadsDone < threadNumber)
+            while (_threadsDone < _threadsNumber)
             {
                 //Wait for all threads to be done
             }

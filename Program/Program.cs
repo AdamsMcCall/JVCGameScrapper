@@ -8,7 +8,7 @@ namespace Program
     {
         static void Main(string[] args)
         {
-            var scrapper = new JVCScrapper(10);
+            var scrapper = new JVCScrapper(2104, 8);
 
             scrapper.GetGrades();
             var json = JsonConvert.SerializeObject(scrapper.gameInfos, Formatting.Indented);
