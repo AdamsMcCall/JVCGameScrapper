@@ -20,15 +20,5 @@ namespace Program
             _threads.Add(newThread);
             newThread.Start(parameter);
         }
-
-        public void WaitAllThreads()
-        {
-            foreach (Thread t in _threads)
-            {
-                if (t == null)
-                    continue;
-                t.Join();
-            }
-        }
     }
 }

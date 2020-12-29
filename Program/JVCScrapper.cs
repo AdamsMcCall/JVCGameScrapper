@@ -13,6 +13,7 @@ namespace Program
     {
         private readonly int _pagesLimit;
         private int _pageNumber = 1;
+        private int _threadsDone = 0;
         private string _url = "https://www.jeuxvideo.com/tous-les-jeux/";
         private string _titleLandmark = "class=\"gameTitleLink__196nPy\"";
         private string _linkLandmark = "/jeux/";
@@ -20,6 +21,7 @@ namespace Program
         public List<GameInfo> gameInfos;
         private Object _pageNumberLock = new Object();
         private Object _gameInfoLock = new Object();
+        private Object _threadsDoneLock = new Object();
 
         public JVCScrapper(int pagesLimit)
         {
@@ -36,9 +38,8 @@ namespace Program
             int currentPageNb = (int)pageNb;
             List<GameInfo> localGameInfos = new List<GameInfo>();
 
-            while (currentPageNb < _pagesLimit)
+            while (currentPageNb <= _pagesLimit)
             {
-                //Console.WriteLine("> Thread no " + threadNb.ToString() + " is still alive !");
                 localGameInfos.AddRange(ParsePage(currentPageNb, webDriver));
                 currentPageNb = GetNextPageNumber();
             }
@@ -47,12 +48,15 @@ namespace Program
                 gameInfos.AddRange(localGameInfos);
             }
             webDriver.Close();
+            lock (_threadsDoneLock)
+            {
+                _threadsDone += 1;
+            }
+            Console.WriteLine("Thread " + threadNb.ToString() + " done !");
         }
 
         List<GameInfo> ParsePage(int pageNb, IWebDriver webDriver)
         {
-            //var client = new HttpClient();
-            //var result = await client.GetStringAsync(_url + "?p=" + pageNb.ToString());
             webDriver.Url = _url + "?p=" + pageNb.ToString();
             var result = webDriver.PageSource;
             var pageGameInfos = new List<GameInfo>();
@@ -74,7 +78,7 @@ namespace Program
                     {
                         name = title,
                         grade = grade,
-                        link = link
+                        link = "https://www.jeuxvideo.com" + link
                     });
                     //Console.WriteLine(title + " - " + grade);
                 }
@@ -83,9 +87,7 @@ namespace Program
             {
 
             }
-            //Console.WriteLine("=============================");
             Console.WriteLine("Page " + pageNb.ToString() + " done");
-            //Console.WriteLine("=============================");
             return pageGameInfos;
         }
 
@@ -104,11 +106,9 @@ namespace Program
         string GetLink(string data)
         {
             var idx = data.IndexOf(_titleLandmark);
-            //Console.WriteLine(idx.ToString());
             var output = data.Substring(BackIndexOf(data, idx, '<'));
             output = output.Remove(output.IndexOf('>'));
             output = output.Substring(output.IndexOf(_linkLandmark));
-            //Console.WriteLine(output.IndexOf('"'));
             output = output.Remove(output.IndexOf('"'));
             return output;
         }
@@ -151,17 +151,16 @@ namespace Program
                 pool.StartThread(new ParameterizedThreadStart(ThreadLoop), _pageNumber);
                 ++_pageNumber;
             }
-            //pool.WaitAllThreads();
-            while (true)
+            while (_threadsDone < threadNumber)
             {
-
+                //Wait for all threads to be done
             }
         }
 
         public void DisplayGrades()
         {
             foreach (GameInfo info in gameInfos)
-                Console.WriteLine(info.name + " - " + info.grade + "/20");
+                Console.WriteLine(info.name + " - " + info.grade + "/20 - " + info.link);
         }
     }
 }
