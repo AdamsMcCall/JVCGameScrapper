@@ -1,4 +1,6 @@
-﻿using System;
+﻿using OpenQA.Selenium;
+using OpenQA.Selenium.Firefox;
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
@@ -13,6 +15,7 @@ namespace Program
         private int _pageNumber = 1;
         private string _url = "https://www.jeuxvideo.com/tous-les-jeux/";
         private string _titleLandmark = "class=\"gameTitleLink__196nPy\"";
+        private string _linkLandmark = "/jeux/";
         private string _gradeLandmark = "class=\"editorialRating__1tYu_r\"";
         public List<GameInfo> gameInfos;
         private Object _pageNumberLock = new Object();
@@ -24,8 +27,11 @@ namespace Program
             _pagesLimit = pagesLimit;
         }
 
-        async void ThreadLoop(object pageNb)
+        void ThreadLoop(object pageNb)
         {
+            var options = new FirefoxOptions();
+            options.AddArgument("--headless");
+            IWebDriver webDriver = new FirefoxDriver(options);
             int threadNb = (int)pageNb;
             int currentPageNb = (int)pageNb;
             List<GameInfo> localGameInfos = new List<GameInfo>();
@@ -33,25 +39,29 @@ namespace Program
             while (currentPageNb < _pagesLimit)
             {
                 //Console.WriteLine("> Thread no " + threadNb.ToString() + " is still alive !");
-                localGameInfos.AddRange(await ParsePage(currentPageNb));
+                localGameInfos.AddRange(ParsePage(currentPageNb, webDriver));
                 currentPageNb = GetNextPageNumber();
             }
             lock (_gameInfoLock)
             {
                 gameInfos.AddRange(localGameInfos);
             }
+            webDriver.Close();
         }
 
-        async Task<List<GameInfo>> ParsePage(int pageNb)
+        List<GameInfo> ParsePage(int pageNb, IWebDriver webDriver)
         {
-            var client = new HttpClient();
-            var result = await client.GetStringAsync(_url + "?p=" + pageNb.ToString());
+            //var client = new HttpClient();
+            //var result = await client.GetStringAsync(_url + "?p=" + pageNb.ToString());
+            webDriver.Url = _url + "?p=" + pageNb.ToString();
+            var result = webDriver.PageSource;
             var pageGameInfos = new List<GameInfo>();
 
             try
             {
                 while (true)
                 {
+                    var link = GetLink(result);
                     var title = GetContent(result, _titleLandmark);
                     title = title.Replace("&#x27;", "'");
                     var grade = GetContent(result, _gradeLandmark);
@@ -63,7 +73,8 @@ namespace Program
                     pageGameInfos.Add(new GameInfo
                     {
                         name = title,
-                        grade = grade
+                        grade = grade,
+                        link = link
                     });
                     //Console.WriteLine(title + " - " + grade);
                 }
@@ -72,7 +83,9 @@ namespace Program
             {
 
             }
+            //Console.WriteLine("=============================");
             Console.WriteLine("Page " + pageNb.ToString() + " done");
+            //Console.WriteLine("=============================");
             return pageGameInfos;
         }
 
@@ -86,6 +99,25 @@ namespace Program
                 output = output.Substring(output.IndexOf('>') + 1);
             output = output.Remove(output.IndexOf('<'));
             return output;
+        }
+
+        string GetLink(string data)
+        {
+            var idx = data.IndexOf(_titleLandmark);
+            //Console.WriteLine(idx.ToString());
+            var output = data.Substring(BackIndexOf(data, idx, '<'));
+            output = output.Remove(output.IndexOf('>'));
+            output = output.Substring(output.IndexOf(_linkLandmark));
+            //Console.WriteLine(output.IndexOf('"'));
+            output = output.Remove(output.IndexOf('"'));
+            return output;
+        }
+
+        int BackIndexOf(string str, int idx, char c)
+        {
+            while (str[idx] != c && idx > -1)
+                --idx;
+            return idx + 1;
         }
 
         string FormatGrade(string rawGrade)
