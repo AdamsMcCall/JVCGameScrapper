@@ -18,6 +18,7 @@ namespace Program
         private string _url = "https://www.jeuxvideo.com/tous-les-jeux/";
         private string _titleLandmark = "class=\"gameTitleLink__196nPy\"";
         private string _linkLandmark = "/jeux/";
+        private string _gradeSpotLandmark = "class=\"hubItem__2vsQLM\"";
         private string _gradeLandmark = "class=\"editorialRating__1tYu_r\"";
         public List<GameInfo> gameInfos;
         private Object _pageNumberLock = new Object();
@@ -62,32 +63,46 @@ namespace Program
             webDriver.Url = _url + "?p=" + pageNb.ToString();
             var result = webDriver.PageSource;
             var pageGameInfos = new List<GameInfo>();
+            int index;
+            int endBufferIndex;
+            string buffer;
 
             try
             {
                 while (true)
                 {
-                    var link = GetLink(result);
-                    var title = GetContent(result, _titleLandmark);
+                    buffer = result;
+                    endBufferIndex = buffer.IndexOf(_gradeSpotLandmark) + 300;
+                    if (endBufferIndex > buffer.Length)
+                        endBufferIndex = buffer.Length;
+                    buffer = buffer.Remove(endBufferIndex);
+                    var link = GetLink(buffer);
+                    var title = GetContent(buffer, _titleLandmark);
                     title = title.Replace("&#x27;", "'");
-                    var grade = GetContent(result, _gradeLandmark);
-                    result = result.Substring(result.IndexOf(_gradeLandmark) + 50);
-                    result = result.Substring(result.IndexOf(_titleLandmark) - 50);
+                    title = title.Replace("&amp;", "&");
+                    var grade = GetGradeContent(buffer);
                     grade = FormatGrade(grade);
-                    if (grade == "-")
-                        continue;
-                    pageGameInfos.Add(new GameInfo
+                    //Console.WriteLine(title + " ~ " + grade + " ~ " + link);
+                    if (grade != "-")
                     {
-                        name = title,
-                        grade = grade,
-                        link = "https://www.jeuxvideo.com" + link
-                    });
-                    //Console.WriteLine(title + " - " + grade);
+                        pageGameInfos.Add(new GameInfo
+                        {
+                            name = title,
+                            grade = grade,
+                            link = "https://www.jeuxvideo.com" + link
+                        });
+                    }
+
+                    result = result.Substring(result.IndexOf(_gradeSpotLandmark));
+                    index = result.IndexOf(_titleLandmark) - 100;
+                    if (index > result.Length)
+                        index = result.Length;
+                    result = result.Substring(index);
                 }
             }
-            catch
+            catch (Exception e)
             {
-
+                //Console.WriteLine(e.Message);
             }
             Console.WriteLine("Page " + pageNb.ToString() + " done");
             return pageGameInfos;
@@ -100,6 +115,21 @@ namespace Program
             idx = output.IndexOf('>') + 1;
             output = output.Substring(idx);
             if (output[0] == '<')
+                output = output.Substring(output.IndexOf('>') + 1);
+            output = output.Remove(output.IndexOf('<'));
+            return output;
+        }
+
+        string GetGradeContent(string data)
+        {
+            var idx = data.IndexOf(_gradeSpotLandmark);
+            var output = data.Substring(idx);
+            
+            idx = output.IndexOf(_gradeLandmark);
+            if (idx == -1)
+                return "- / 20";
+            output = output.Substring(idx);
+            if (output[0] == 'c')
                 output = output.Substring(output.IndexOf('>') + 1);
             output = output.Remove(output.IndexOf('<'));
             return output;
@@ -124,6 +154,7 @@ namespace Program
 
         string FormatGrade(string rawGrade)
         {
+            //Console.WriteLine(rawGrade);
             var output = rawGrade.Remove(rawGrade.IndexOf('/'));
 
             if (float.TryParse(output, out _))
@@ -156,6 +187,14 @@ namespace Program
             {
                 //Wait for all threads to be done
             }
+        }
+
+        public void GetGradesOnPage(int pageNumber)
+        {
+            var options = new FirefoxOptions();
+            options.AddArgument("--headless");
+            IWebDriver webDriver = new FirefoxDriver(options);
+            ParsePage(pageNumber, webDriver);
         }
 
         public void DisplayGrades()
